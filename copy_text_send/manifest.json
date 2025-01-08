@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Text to SQL Format",
+  "version": "1.0",
+  "description": "Send selected text from Kibana to SQL Format input fields.",
+  "icons": {
+    "128": "icon.png"
+  },
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "notifications"
+  ],
+  "host_permissions": [
+    "*://kibana.yourdomain.com/*",
+    "*://sql.pprompt.cn/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

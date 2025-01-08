@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Formatter and Preview</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f9f9f9;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            margin: 10px 0;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            resize: vertical;
+        }
+        pre {
+            font-family: 'Consolas', monospace;
+            line-height: 1.4;
+            font-size: 14px;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .preview-section {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .copy-button {
+            padding: 5px 10px;
+            font-size: 14px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .copy-button:hover {
+            background-color: #0056b3;
+        }
+        .copy-notification {
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            background-color: #28a745;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h2>SQL Formatter and Preview</h2>
+    <div class="container">
+        <div class="input-group">
+            <label for="sqlInput">SQL Input:</label>
+            <textarea id="sqlInput" placeholder="Enter your SQL query here...">SELECT count(0) FROM (SELECT * FROM table WHERE column1 = ? AND column2 = ?)</textarea>
+        </div>
+        <div class="input-group">
+            <label for="paramsInput">Parameters (comma-separated):</label>
+            <textarea id="paramsInput" placeholder="Format: value(type), e.g., 20241230(String), 2(Integer)">20241230(String), 2(Integer)</textarea>
+        </div>
+        <div class="preview-section">
+            <div class="preview-header">
+                <h3>Preview:</h3>
+                <button class="copy-button" onclick="copyToClipboard()">Copy SQL</button>
+            </div>
+            <pre id="sqlPreview">Formatted SQL will appear here...</pre>
+            <div id="copyNotification" class="copy-notification">Copied!</div>
+        </div>
+    </div>
+
+    <script>
+        function formatSQL(sql) {
+            sql = sql.replace(/\s+/g, ' ').trim();
+            sql = sql.replace(/\(/g, '\n(').replace(/\)/g, ')\n');
+            sql = sql.replace(/\(\s*SELECT/gi, '(\n  SELECT');
+            
+            const keywords = {
+                major: ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'UNION'],
+                joins: ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN', 'CROSS JOIN'],
+                conditions: ['AND', 'OR'],
+                other: ['ON', 'AS', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END']
+            };
+
+            keywords.major.forEach(keyword => {
+                sql = sql.replace(new RegExp(`\\b${keyword}\\b`, 'gi'), `\n${keyword}`);
+            });
+
+            keywords.joins.forEach(keyword => {
+                sql = sql.replace(new RegExp(`\\b${keyword}\\b`, 'gi'), `\n${keyword}`);
+            });
+
+            keywords.conditions.forEach(keyword => {
+                sql = sql.replace(new RegExp(`\\b${keyword}\\b`, 'gi'), `\n  ${keyword}`);
+            });
+
+            const lines = sql.split('\n');
+            let indent = 0;
+            sql = lines.map(line => {
+                line = line.trim();
+                if (line.includes(')')) indent = Math.max(0, indent - 2);
+                const spaces = ' '.repeat(indent);
+                if (line.includes('(')) indent += 2;
+                return spaces + line;
+            }).join('\n');
+
+            return sql.trim();
+        }
+
+        function buildSQL() {
+            let sqlInput = document.getElementById('sqlInput').value;
+            const paramsInput = document.getElementById('paramsInput').value;
+
+            const params = paramsInput.split(',')
+                .map(param => param.trim())
+                .filter(param => param);
+
+            const values = params.map(param => {
+                const value = param.replace(/\(.*\)/, '').trim();
+                const type = (param.match(/\((.*?)\)/) || [])[1];
+                return type === 'Integer' || type === 'Number' || type === 'Long' ? value : `'${value}'`;
+            });
+
+            const questionMarks = sqlInput.match(/\?/g) || [];
+            console.log('Number of ? found:', questionMarks.length);
+
+            if (questionMarks.length > values.length) {
+                console.warn(`Warning: Not enough parameters. Need ${questionMarks.length} but got ${values.length}`);
+            }
+
+            let paramIndex = 0;
+
+            sqlInput = sqlInput.replace(/\?/g, () => {
+                if (paramIndex < values.length) {
+                    return values[paramIndex++];
+                }
+                return '?';
+            });
+
+            const formattedSQL = formatSQL(sqlInput);
+            document.getElementById('sqlPreview').textContent = formattedSQL;
+        }
+
+        function copyToClipboard() {
+            const sqlPreview = document.getElementById('sqlPreview');
+            const range = document.createRange();
+            range.selectNode(sqlPreview);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            try {
+                document.execCommand('copy');
+                showCopyNotification();
+            } catch (err) {
+                console.error('Failed to copy SQL.');
+            }
+            window.getSelection().removeAllRanges();
+        }
+
+        function showCopyNotification() {
+            const notification = document.getElementById('copyNotification');
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+
+        document.getElementById('sqlInput').addEventListener('input', buildSQL);
+        document.getElementById('paramsInput').addEventListener('input', buildSQL);
+        document.getElementById('sqlInput').addEventListener('blur', buildSQL);
+        document.getElementById('paramsInput').addEventListener('blur', buildSQL);
+
+        // Initial build
+        buildSQL();
+    </script>
+</body>
+</html>
