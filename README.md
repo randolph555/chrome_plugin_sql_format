@@ -1,2 +1,2 @@
 # chrome_plugin_sql_format
-由HTML是由cursor完成,插件是由deepseek完成
+# HTML是由cursor完成,插件是由deepseek完成
